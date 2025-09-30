@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aquaculture Environmental Monitor</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #1e3a8a;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .subtitle { color: #64748b; margin-top: 8px; }
+        .alert-summary {
+            display: flex;
+            gap: 30px;
+        }
+        .alert-box {
+            text-align: center;
+        }
+        .alert-count {
+            font-size: 32px;
+            font-weight: bold;
+        }
+        .alert-label {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+        .critical { color: #dc2626; }
+        .warning { color: #f59e0b; }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .metric-card.active {
+            border: 2px solid #0891b2;
+            box-shadow: 0 0 0 3px rgba(8,145,178,0.1);
+        }
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .metric-icon {
+            font-size: 24px;
+        }
+        .metric-label {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .status-good { color: #16a34a; }
+        .status-warning { color: #f59e0b; }
+        .status-critical { color: #dc2626; }
+        .chart-container {
+            width: 100%;
+            height: 300px;
+            position: relative;
+        }
+        canvas { max-width: 100%; }
+        .alerts-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .alert-item {
+            padding: 16px;
+            border-left: 4px solid;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .alert-item.critical {
+            background: #fee2e2;
+            border-color: #dc2626;
+        }
+        .alert-item.warning {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+        .alert-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .alert-metric {
+            font-weight: bold;
+            color: #1e293b;
+        }
+        .alert-time {
+            font-size: 12px;
+            color: #64748b;
+        }
+        .alert-message {
+            font-size: 14px;
+            color: #334155;
+            margin-bottom: 8px;
+        }
+        .alert-action {
+            font-size: 14px;
+            color: #1e293b;
+        }
+        .alert-action strong {
+            color: #0891b2;
+        }
+        .thresholds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+        }
+        .threshold-group {
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+        .threshold-title {
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 12px;
+        }
+        .threshold-input {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .threshold-input label {
+            min-width: 70px;
+            font-size: 14px;
+            color: #64748b;
+        }
+        .threshold-input input {
+            width: 80px;
+            padding: 6px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .threshold-input.critical input {
+            border-color: #dc2626;
+        }
+        .threshold-input.critical label {
+            color: #dc2626;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="card">
+            <div class="header">
+                <div>
+                    <div class="title">
+                        <span>🌊</span> Aquaculture Environmental Monitor
+                    </div>
+                    <div class="subtitle">Real-time water quality monitoring and alerts</div>
+                </div>
+                <div class="alert-summary">
+                    <div class="alert-box">
+                        <div class="alert-count critical" id="critical-count">0</div>
+                        <div class="alert-label">Critical</div>
+                    </div>
+                    <div class="alert-box">
+                        <div class="alert-count warning" id="warning-count">0</div>
+                        <div class="alert-label">Warnings</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics Cards -->
+        <div class="metrics-grid" id="metrics-grid"></div>
+
+        <!-- Chart -->
+        <div class="card">
+            <h2 style="margin-bottom: 16px; color: #1e293b;" id="chart-title">Temperature Trend</h2>
+            <div class="chart-container">
+                <canvas id="trend-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Alerts -->
+        <div class="card">
+            <h2 style="margin-bottom: 16px; color: #1e293b;">🔔 Active Alerts & Recommendations</h2>
+            <div class="alerts-list" id="alerts-list">
+                <div class="empty-state">All parameters within normal range ✓</div>
+            </div>
+        </div>
+
+        <!-- Thresholds -->
+        <div class="card">
+            <h2 style="margin-bottom: 16px; color: #1e293b;">⚙️ Threshold Configuration</h2>
+            <div class="thresholds-grid" id="thresholds-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        // Data state
+        let currentData = {
+            temperature: 18.5,
+            salinity: 33.2,
+            oxygen: 7.8,
+            chlorophyll: 0.3,
+            currentSpeed: 0.15,
+            ph: 8.1
+        };
+
+        let historicalData = [];
+        let alerts = [];
+        let selectedMetric = 'temperature';
+
+        // Initialize with some historical data points for immediate chart display
+        function initializeHistoricalData() {
+            const now = new Date();
+            for (let i = 10; i >= 0; i--) {
+                const time = new Date(now - i * 180000); // 3 minutes apart
+                historicalData.push({
+                    time: time.toLocaleTimeString(),
+                    temperature: 18.5 + (Math.random() - 0.5) * 2,
+                    salinity: 33.2 + (Math.random() - 0.5) * 1,
+                    oxygen: 7.8 + (Math.random() - 0.5) * 0.5,
+                    chlorophyll: 0.3 + (Math.random() - 0.5) * 0.2,
+                    currentSpeed: 0.15 + (Math.random() - 0.5) * 0.08,
+                    ph: 8.1 + (Math.random() - 0.5) * 0.2
+                });
+            }
+        }
+
+        let thresholds = {
+            temperature: { min: 10, max: 22, critical: 25 },
+            salinity: { min: 28, max: 35, critical: 38 },
+            oxygen: { min: 6.0, critical: 5.0 },
+            chlorophyll: { max: 2.0, critical: 5.0 },
+            currentSpeed: { max: 0.5, critical: 0.8 },
+            ph: { min: 7.5, max: 8.5, critical: 9.0 }
+        };
+
+        const metrics = [
+            { key: 'temperature', label: 'Temperature', unit: '°C', icon: '🌡️' },
+            { key: 'salinity', label: 'Salinity', unit: 'ppt', icon: '💧' },
+            { key: 'oxygen', label: 'Dissolved O₂', unit: 'mg/L', icon: '💨' },
+            { key: 'chlorophyll', label: 'Chlorophyll-a', unit: 'mg/m³', icon: '🌿' },
+            { key: 'currentSpeed', label: 'Current Speed', unit: 'm/s', icon: '🌊' },
+            { key: 'ph', label: 'pH Level', unit: '', icon: '⚗️' }
+        ];
+
+        // Chart setup
+        const canvas = document.getElementById('trend-chart');
+        const ctx = canvas.getContext('2d');
+
+        function renderMetrics() {
+            const grid = document.getElementById('metrics-grid');
+            grid.innerHTML = metrics.map(m => {
+                const value = currentData[m.key];
+                const status = getStatus(m.key, value);
+                const trend = getTrend(m.key);
+                const trendIcon = trend === 'up' ? '📈' : trend === 'down' ? '📉' : '➡️';
+                
+                return `
+                    <div class="metric-card ${selectedMetric === m.key ? 'active' : ''}" onclick="selectMetric('${m.key}')">
+                        <div class="metric-header">
+                            <span class="metric-icon">${m.icon}</span>
+                            <span>${trendIcon}</span>
+                        </div>
+                        <div class="metric-label">${m.label}</div>
+                        <div class="metric-value status-${status}">
+                            ${value.toFixed(m.key === 'currentSpeed' ? 2 : 1)}${m.unit}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getStatus(metric, value) {
+            const t = thresholds[metric];
+            
+            if (metric === 'oxygen') {
+                if (value < t.critical) return 'critical';
+                if (value < t.min) return 'warning';
+                return 'good';
+            }
+            
+            if (metric === 'temperature') {
+                if (value > t.critical || value < (t.min - 2)) return 'critical';
+                if (value > t.max || value < t.min) return 'warning';
+                return 'good';
+            }
+            
+            if (metric === 'salinity') {
+                if (value > t.critical || value < (t.min - 3)) return 'critical';
+                if (value > t.max || value < t.min) return 'warning';
+                return 'good';
+            }
+            
+            if (metric === 'chlorophyll') {
+                if (value > t.critical) return 'critical';
+                if (value > t.max) return 'warning';
+                return 'good';
+            }
+            
+            if (metric === 'currentSpeed') {
+                if (value > t.critical) return 'critical';
+                if (value > t.max) return 'warning';
+                return 'good';
+            }
+            
+            if (metric === 'ph') {
+                if (value > t.critical || value < (t.min - 0.5)) return 'critical';
+                if (value > t.max || value < t.min) return 'warning';
+                return 'good';
+            }
+            
+            return 'good';
+        }
+
+        function getTrend(metric) {
+            if (historicalData.length < 2) return 'stable';
+            const recent = historicalData.slice(-5);
+            const avg = recent.reduce((sum, d) => sum + d[metric], 0) / recent.length;
+            const current = currentData[metric];
+            
+            if (current > avg * 1.02) return 'up';
+            if (current < avg * 0.98) return 'down';
+            return 'stable';
+        }
+
+        function selectMetric(metric) {
+            selectedMetric = metric;
+            const metricObj = metrics.find(m => m.key === metric);
+            document.getElementById('chart-title').textContent = `${metricObj.label} Trend`;
+            renderMetrics();
+            drawChart();
+        }
+
+        function drawChart() {
+            const width = canvas.width = canvas.offsetWidth * 2;
+            const height = canvas.height = 600;
+            ctx.clearRect(0, 0, width, height);
+
+            if (historicalData.length < 2) {
+                ctx.fillStyle = '#64748b';
+                ctx.font = '32px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Collecting data...', width / 2, height / 2);
+                return;
+            }
+
+            const padding = 100;
+            const chartWidth = width - 2 * padding;
+            const chartHeight = height - 2 * padding;
+
+            const values = historicalData.map(d => d[selectedMetric]);
+            const minVal = Math.min(...values) * 0.95;
+            const maxVal = Math.max(...values) * 1.05;
+            const range = maxVal - minVal;
+
+            // Draw grid
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 2;
+            for (let i = 0; i <= 5; i++) {
+                const y = padding + (chartHeight / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(width - padding, y);
+                ctx.stroke();
+            }
+
+            // Draw threshold lines
+            const t = thresholds[selectedMetric];
+            if (t.max) {
+                const y = padding + chartHeight - ((t.max - minVal) / range * chartHeight);
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([10, 5]);
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(width - padding, y);
+                ctx.stroke();
+            }
+            if (t.critical) {
+                const y = padding + chartHeight - ((t.critical - minVal) / range * chartHeight);
+                ctx.strokeStyle = '#dc2626';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([10, 5]);
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(width - padding, y);
+                ctx.stroke();
+            }
+
+            // Draw data line
+            ctx.setLineDash([]);
+            ctx.strokeStyle = '#0891b2';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            
+            historicalData.forEach((d, i) => {
+                const x = padding + (chartWidth / (historicalData.length - 1)) * i;
+                const y = padding + chartHeight - ((d[selectedMetric] - minVal) / range * chartHeight);
+                
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Draw axes labels
+            ctx.fillStyle = '#1e293b';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const value = maxVal - (range / 5) * i;
+                const y = padding + (chartHeight / 5) * i;
+                ctx.fillText(value.toFixed(1), padding - 20, y + 10);
+            }
+        }
+
+        function renderAlerts() {
+            const list = document.getElementById('alerts-list');
+            
+            if (alerts.length === 0) {
+                list.innerHTML = '<div class="empty-state">All parameters within normal range ✓</div>';
+                return;
+            }
+
+            list.innerHTML = alerts.map(alert => `
+                <div class="alert-item ${alert.severity}">
+                    <div class="alert-header">
+                        <span class="alert-metric">${alert.metric}</span>
+                        <span class="alert-time">${alert.timestamp}</span>
+                    </div>
+                    <div class="alert-message">${alert.message}</div>
+                    <div class="alert-action">
+                        <strong>Recommended Action:</strong> ${alert.action}
+                    </div>
+                </div>
+            `).join('');
+
+            // Update counts
+            const criticalCount = alerts.filter(a => a.severity === 'critical').length;
+            const warningCount = alerts.filter(a => a.severity === 'warning').length;
+            document.getElementById('critical-count').textContent = criticalCount;
+            document.getElementById('warning-count').textContent = warningCount;
+        }
+
+        function renderThresholds() {
+            const grid = document.getElementById('thresholds-grid');
+            grid.innerHTML = metrics.map(m => {
+                const t = thresholds[m.key];
+                return `
+                    <div class="threshold-group">
+                        <div class="threshold-title">${m.label}</div>
+                        ${t.min !== undefined ? `
+                            <div class="threshold-input">
+                                <label>Min:</label>
+                                <input type="number" step="0.1" value="${t.min}" 
+                                    onchange="updateThreshold('${m.key}', 'min', this.value)">
+                                <span>${m.unit}</span>
+                            </div>
+                        ` : ''}
+                        ${t.max !== undefined ? `
+                            <div class="threshold-input">
+                                <label>Max:</label>
+                                <input type="number" step="0.1" value="${t.max}" 
+                                    onchange="updateThreshold('${m.key}', 'max', this.value)">
+                                <span>${m.unit}</span>
+                            </div>
+                        ` : ''}
+                        ${t.critical !== undefined ? `
+                            <div class="threshold-input critical">
+                                <label>Critical:</label>
+                                <input type="number" step="0.1" value="${t.critical}" 
+                                    onchange="updateThreshold('${m.key}', 'critical', this.value)">
+                                <span>${m.unit}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateThreshold(metric, type, value) {
+            thresholds[metric][type] = parseFloat(value);
+        }
+
+        function checkThresholds(data, timestamp) {
+            const newAlerts = [];
+
+            // Temperature
+            if (data.temperature > thresholds.temperature.critical) {
+                newAlerts.push({
+                    id: Date.now() + 'temp-crit',
+                    severity: 'critical',
+                    metric: 'Temperature',
+                    message: `CRITICAL: Water temperature ${data.temperature.toFixed(1)}°C exceeds critical threshold. Immediate mortality risk!`,
+                    action: 'Deploy aerators, consider emergency harvest, or move stock to cooler areas.',
+                    timestamp
+                });
+            } else if (data.temperature > thresholds.temperature.max || data.temperature < thresholds.temperature.min) {
+                newAlerts.push({
+                    id: Date.now() + 'temp-warn',
+                    severity: 'warning',
+                    metric: 'Temperature',
+                    message: `WARNING: Water temperature ${data.temperature.toFixed(1)}°C outside optimal range.`,
+                    action: 'Monitor closely, adjust feeding, prepare management measures.',
+                    timestamp
+                });
+            }
+
+            // Oxygen
+            if (data.oxygen < thresholds.oxygen.critical) {
+                newAlerts.push({
+                    id: Date.now() + 'o2-crit',
+                    severity: 'critical',
+                    metric: 'Dissolved Oxygen',
+                    message: `CRITICAL: DO level ${data.oxygen.toFixed(1)} mg/L - Severe hypoxia! Mass mortality imminent!`,
+                    action: 'Deploy all aerators immediately, stop feeding, consider emergency harvest.',
+                    timestamp
+                });
+            } else if (data.oxygen < thresholds.oxygen.min) {
+                newAlerts.push({
+                    id: Date.now() + 'o2-warn',
+                    severity: 'warning',
+                    metric: 'Dissolved Oxygen',
+                    message: `WARNING: DO level ${data.oxygen.toFixed(1)} mg/L below optimal range.`,
+                    action: 'Increase aeration, reduce feeding, monitor for stress behavior.',
+                    timestamp
+                });
+            }
+
+            // Salinity
+            if (data.salinity > thresholds.salinity.critical || data.salinity < (thresholds.salinity.min - 3)) {
+                newAlerts.push({
+                    id: Date.now() + 'sal-crit',
+                    severity: 'critical',
+                    metric: 'Salinity',
+                    message: `CRITICAL: Salinity ${data.salinity.toFixed(1)} ppt at dangerous levels!`,
+                    action: 'Adjust water exchange rates immediately.',
+                    timestamp
+                });
+            } else if (data.salinity > thresholds.salinity.max || data.salinity < thresholds.salinity.min) {
+                newAlerts.push({
+                    id: Date.now() + 'sal-warn',
+                    severity: 'warning',
+                    metric: 'Salinity',
+                    message: `WARNING: Salinity ${data.salinity.toFixed(1)} ppt outside optimal range.`,
+                    action: 'Monitor trends, adjust water management as needed.',
+                    timestamp
+                });
+            }
+
+            // Chlorophyll-a
+            if (data.chlorophyll > thresholds.chlorophyll.critical) {
+                newAlerts.push({
+                    id: Date.now() + 'chl-crit',
+                    severity: 'critical',
+                    metric: 'Chlorophyll-a',
+                    message: `CRITICAL: Chlorophyll-a ${data.chlorophyll.toFixed(1)} mg/m³ - Severe algal bloom! Toxin and oxygen depletion risk!`,
+                    action: 'Stop feeding immediately, increase aeration, monitor for oxygen crash, consider water treatment or stock relocation.',
+                    timestamp
+                });
+            } else if (data.chlorophyll > thresholds.chlorophyll.max) {
+                newAlerts.push({
+                    id: Date.now() + 'chl-warn',
+                    severity: 'warning',
+                    metric: 'Chlorophyll-a',
+                    message: `WARNING: Chlorophyll-a ${data.chlorophyll.toFixed(1)} mg/m³ elevated - Algal bloom developing.`,
+                    action: 'Reduce feeding, monitor oxygen levels closely, increase water exchange if possible, watch for further bloom development.',
+                    timestamp
+                });
+            }
+
+            // Current Speed
+            if (data.currentSpeed > thresholds.currentSpeed.critical) {
+                newAlerts.push({
+                    id: Date.now() + 'curr-crit',
+                    severity: 'critical',
+                    metric: 'Current Speed',
+                    message: `CRITICAL: Current speed ${data.currentSpeed.toFixed(2)} m/s - Risk of cage damage!`,
+                    action: 'Inspect mooring lines and nets immediately.',
+                    timestamp
+                });
+            } else if (data.currentSpeed > thresholds.currentSpeed.max) {
+                newAlerts.push({
+                    id: Date.now() + 'curr-warn',
+                    severity: 'warning',
+                    metric: 'Current Speed',
+                    message: `WARNING: Current speed ${data.currentSpeed.toFixed(2)} m/s elevated.`,
+                    action: 'Monitor cage integrity, check mooring systems.',
+                    timestamp
+                });
+            }
+
+            // pH
+            if (data.ph > thresholds.ph.critical || data.ph < (thresholds.ph.min - 0.5)) {
+                newAlerts.push({
+                    id: Date.now() + 'ph-crit',
+                    severity: 'critical',
+                    metric: 'pH',
+                    message: `CRITICAL: pH ${data.ph.toFixed(1)} at dangerous levels!`,
+                    action: 'Investigate source, consider water treatment.',
+                    timestamp
+                });
+            } else if (data.ph > thresholds.ph.max || data.ph < thresholds.ph.min) {
+                newAlerts.push({
+                    id: Date.now() + 'ph-warn',
+                    severity: 'warning',
+                    metric: 'pH',
+                    message: `WARNING: pH ${data.ph.toFixed(1)} outside optimal range.`,
+                    action: 'Monitor trends, check for algal blooms or pollution.',
+                    timestamp
+                });
+            }
+
+            if (newAlerts.length > 0) {
+                alerts = [...newAlerts, ...alerts].slice(0, 50);
+                renderAlerts();
+            }
+        }
+
+        // Update loop
+        function update() {
+            const timestamp = new Date().toLocaleTimeString();
+            
+            currentData = {
+                temperature: Math.max(8, Math.min(26, currentData.temperature + (Math.random() - 0.5) * 0.8)),
+                salinity: Math.max(26, Math.min(40, currentData.salinity + (Math.random() - 0.5) * 0.4)),
+                oxygen: Math.max(4, Math.min(10, currentData.oxygen + (Math.random() - 0.5) * 0.3)),
+                chlorophyll: Math.max(0, Math.min(8, currentData.chlorophyll + (Math.random() - 0.5) * 0.3)),
+                currentSpeed: Math.max(0, Math.min(1, currentData.currentSpeed + (Math.random() - 0.5) * 0.05)),
+                ph: Math.max(7, Math.min(9, currentData.ph + (Math.random() - 0.5) * 0.1))
+            };
+
+            checkThresholds(currentData, timestamp);
+            
+            historicalData.push({ time: timestamp, ...currentData });
+            if (historicalData.length > 20) historicalData.shift();
+
+            renderMetrics();
+            drawChart();
+        }
+
+        // Initialize
+        initializeHistoricalData(); // Add initial data points
+        renderMetrics();
+        renderThresholds();
+        drawChart();
+
+        // Start updates
+        setInterval(update, 3000);
+    </script>
+</body>
+</html>
